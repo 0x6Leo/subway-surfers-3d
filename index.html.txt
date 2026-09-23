@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subway Surfers 3D - DLI Edition</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js & FontAwesome Icons -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Outfit:wght@400;600;800&display=swap');
+        
+        body {
+            font-family: 'Outfit', sans-serif;
+            touch-action: none;
+            user-select: none;
+            overflow: hidden;
+            background-color: #0f172a;
+        }
+        
+        .font-game {
+            font-family: 'Fredoka One', cursive, sans-serif;
+        }
+
+        .text-stroke-2 {
+            -webkit-text-stroke: 2px #000;
+        }
+
+        .text-shadow-glow {
+            text-shadow: 0 0 10px rgba(234, 179, 8, 0.8), 0 0 20px rgba(234, 179, 8, 0.4);
+        }
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.82);
+            backdrop-filter: blur(12px);
+            border: 2px solid rgba(255, 255, 255, 0.15);
+        }
+
+        /* Pulse animation for hearts */
+        @keyframes heartPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.25); }
+            100% { transform: scale(1); }
+        }
+        .heart-active {
+            animation: heartPulse 1.2s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="w-full h-screen relative bg-slate-950 text-white overflow-hidden select-none">
+
+    <!-- 3D Canvas -->
+    <canvas id="game-canvas" class="w-full h-full absolute inset-0 z-0 block"></canvas>
+
+    <!-- UI Overlay container -->
+    <div id="ui-container" class="absolute inset-0 z-10 pointer-events-none flex flex-col justify-between p-4 md:p-6">
+        
+        <!-- Top HUD Bar -->
+        <div class="flex justify-between items-start w-full max-w-5xl mx-auto">
+            
+            <!-- Player Status: Lives & Multiplier -->
+            <div class="flex flex-col gap-2">
+                <!-- 3 Lives Container -->
+                <div class="glass-panel px-4 py-2 rounded-2xl flex items-center gap-2 pointer-events-auto shadow-xl">
+                    <span class="text-xs uppercase tracking-wider text-slate-300 font-bold mr-1">Lives:</span>
+                    <div id="lives-display" class="flex items-center gap-1.5">
+                        <i class="fa-solid fa-heart text-red-500 text-2xl heart-active filter drop-shadow"></i>
+                        <i class="fa-solid fa-heart text-red-500 text-2xl heart-active filter drop-shadow"></i>
+                        <i class="fa-solid fa-heart text-red-500 text-2xl heart-active filter drop-shadow"></i>
+                    </div>
+                </div>
+
+                <!-- Active Powerups Bar -->
+                <div id="powerup-bar" class="flex gap-2"></div>
+            </div>
+
+            <!-- Score & Coins Center/Right HUD -->
+            <div class="flex flex-col items-end gap-2">
+                <!-- Multiplier badge & Score -->
+                <div class="glass-panel px-5 py-2 rounded-2xl flex items-center gap-3 pointer-events-auto shadow-xl border-amber-500/30">
+                    <div class="bg-amber-500 text-slate-950 font-game px-2 py-0.5 rounded-lg text-sm font-bold animate-pulse">
+                        2x
+                    </div>
+                    <div class="text-right">
+                        <div class="text-[10px] uppercase text-slate-400 font-bold tracking-widest">Score</div>
+                        <div id="score-text" class="text-2xl md:text-3xl font-game text-yellow-400 tracking-wider">000000</div>
+                    </div>
+                </div>
+
+                <!-- DLI Coins Counter -->
+                <div class="glass-panel px-4 py-1.5 rounded-2xl flex items-center gap-2.5 pointer-events-auto border-yellow-400/40">
+                    <div class="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-600 via-yellow-400 to-amber-200 border-2 border-yellow-100 flex items-center justify-center font-black text-[10px] text-slate-950 shadow-lg shadow-yellow-500/50">
+                        DLI
+                    </div>
+                    <span id="coin-text" class="text-xl font-game text-amber-300">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center In-Game Messages / Invulnerability indicator -->
+        <div class="self-center text-center my-auto pointer-events-none">
+            <div id="status-toast" class="hidden glass-panel px-6 py-3 rounded-2xl text-2xl font-game text-yellow-300 border-yellow-500/50 shadow-2xl animate-bounce">
+                SHIELD ACTIVE!
+            </div>
+        </div>
+
+        <!-- Bottom HUD Controls Info / Pause Button -->
+        <div class="flex justify-between items-end w-full max-w-5xl mx-auto pointer-events-auto">
+            <button id="pause-btn" class="glass-panel p-3.5 rounded-2xl text-white hover:bg-slate-800/80 active:scale-95 transition-all shadow-lg border-slate-600">
+                <i class="fa-solid fa-pause text-xl w-6 h-6 flex items-center justify-center"></i>
+            </button>
+
+            <!-- Touch Control Hint for Mobile -->
+            <div class="hidden md:flex glass-panel px-4 py-2 rounded-xl text-xs text-slate-300 gap-3 items-center opacity-80">
+                <span><kbd class="px-1.5 py-0.5 bg-slate-700 rounded text-yellow-400 font-mono">A</kbd>/<kbd class="px-1.5 py-0.5 bg-slate-700 rounded text-yellow-400 font-mono">D</kbd> or <kbd class="px-1.5 py-0.5 bg-slate-700 rounded text-yellow-400 font-mono">←</kbd>/<kbd class="px-1.5 py-0.5 bg-slate-700 rounded text-yellow-400 font-mono">→</kbd> Switch Lanes</span>
+                <span><kbd class="px-1.5 py-0.5 bg-slate-700 rounded text-yellow-400 font-mono">Space</kbd> / <kbd class="px-1.5 py-0.5 bg-slate-700 rounded text-yellow-400 font-mono">↑</kbd> Jump</span>
+                <span><kbd class="px-1.5 py-0.5 bg-slate-700 rounded text-yellow-400 font-mono">S</kbd> / <kbd class="px-1.5 py-0.5 bg-slate-700 rounded text-yellow-400 font-mono">↓</kbd> Roll</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Start Menu Modal -->
+    <div id="start-modal" class="fixed inset-0 z-30 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+        <div class="glass-panel w-full max-w-md rounded-3xl p-6 md:p-8 text-center border-amber-500/30 shadow-2xl relative overflow-hidden">
+            <!-- Background Accent glow -->
+            <div class="absolute -top-10 -left-10 w-40 h-40 bg-amber-500/20 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute -bottom-10 -right-10 w-40 h-40 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none"></div>
+
+            <h1 class="text-4xl md:text-5xl font-game text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-400 to-orange-500 tracking-wide mb-1 drop-shadow-md">
+                SUBWAY SURF
+            </h1>
+            <p class="text-sm font-semibold tracking-widest text-amber-400 uppercase mb-6">DLI Edition - 3 Lives</p>
+
+            <!-- Custom Avatar Upload Preview Row -->
+            <div class="bg-slate-900/80 border border-slate-700/80 rounded-2xl p-4 mb-6 text-left">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                        <i class="fa-solid fa-user-gear text-amber-400"></i> Character Avatar Customizer
+                    </span>
+                    <button id="open-customizer-btn" class="text-xs text-amber-400 hover:underline font-bold">Customize All</button>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2">
+                    <!-- Main Runner Box -->
+                    <div class="flex flex-col items-center p-2 bg-slate-800/80 rounded-xl border border-slate-700 text-center">
+                        <div class="w-12 h-12 rounded-full overflow-hidden bg-amber-500/20 border-2 border-amber-400 mb-1 relative flex items-center justify-center">
+                            <img id="preview-player-img" class="w-full h-full object-cover hidden" alt="Player">
+                            <i id="preview-player-icon" class="fa-solid fa-user text-amber-300 text-xl"></i>
+                        </div>
+                        <span class="text-[11px] text-slate-300 font-bold">Runner</span>
+                        <label class="mt-1 px-2 py-0.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded text-[10px] cursor-pointer transition">
+                            Upload
+                            <input type="file" id="upload-player-face" accept="image/*" class="hidden">
+                        </label>
+                    </div>
+
+                    <!-- Inspector Box -->
+                    <div class="flex flex-col items-center p-2 bg-slate-800/80 rounded-xl border border-slate-700 text-center">
+                        <div class="w-12 h-12 rounded-full overflow-hidden bg-blue-500/20 border-2 border-blue-400 mb-1 relative flex items-center justify-center">
+                            <img id="preview-police-img" class="w-full h-full object-cover hidden" alt="Inspector">
+                            <i id="preview-police-icon" class="fa-solid fa-user-shield text-blue-400 text-xl"></i>
+                        </div>
+                        <span class="text-[11px] text-slate-300 font-bold">Inspector</span>
+                        <label class="mt-1 px-2 py-0.5 bg-blue-500 hover:bg-blue-400 text-slate-950 font-bold rounded text-[10px] cursor-pointer transition">
+                            Upload
+                            <input type="file" id="upload-police-face" accept="image/*" class="hidden">
+                        </label>
+                    </div>
+
+                    <!-- Dog Box -->
+                    <div class="flex flex-col items-center p-2 bg-slate-800/80 rounded-xl border border-slate-700 text-center">
+                        <div class="w-12 h-12 rounded-full overflow-hidden bg-amber-700/20 border-2 border-amber-600 mb-1 relative flex items-center justify-center">
+                            <img id="preview-dog-img" class="w-full h-full object-cover hidden" alt="Dog">
+                            <i id="preview-dog-icon" class="fa-solid fa-dog text-amber-500 text-xl"></i>
+                        </div>
+                        <span class="text-[11px] text-slate-300 font-bold">Chaser Dog</span>
+                        <label class="mt-1 px-2 py-0.5 bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold rounded text-[10px] cursor-pointer transition">
+                            Upload
+                            <input type="file" id="upload-dog-face" accept="image/*" class="hidden">
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Features Info Pill -->
+            <div class="flex items-center justify-center gap-4 text-xs text-slate-300 mb-6 bg-slate-900/50 py-2 px-4 rounded-xl border border-slate-800">
+                <span class="flex items-center gap-1"><i class="fa-solid fa-heart text-red-400"></i> 3 Lives</span>
+                <span class="flex items-center gap-1"><i class="fa-solid fa-coins text-yellow-400"></i> DLI Coins</span>
+                <span class="flex items-center gap-1"><i class="fa-solid fa-bolt text-indigo-400"></i> Powerups</span>
+            </div>
+
+            <button id="start-btn" class="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-game text-2xl tracking-wider uppercase shadow-xl shadow-amber-500/20 active:scale-95 transition-all">
+                PLAY GAME
+            </button>
+        </div>
+    </div>
+
+    <!-- Avatar Customizer Modal -->
+    <div id="customizer-modal" class="fixed inset-0 z-40 hidden flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">
+        <div class="glass-panel w-full max-w-md rounded-3xl p-6 text-center border-slate-700 shadow-2xl relative">
+            <button id="close-customizer-btn" class="absolute top-4 right-4 text-slate-400 hover:text-white text-xl">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <h2 class="text-2xl font-game text-yellow-400 mb-2">Character Texture Studio</h2>
+            <p class="text-xs text-slate-300 mb-6">Upload photos to map custom faces & body decals on your game characters.</p>
+
+            <div class="space-y-4 text-left">
+                <!-- Runner customizer -->
+                <div class="bg-slate-900/80 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between">
+                    <div>
+                        <div class="text-sm font-bold text-white">Main Surfer Character</div>
+                        <div class="text-xs text-slate-400">Custom Face / Head Texture</div>
+                    </div>
+                    <label class="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl cursor-pointer">
+                        Select Photo
+                        <input type="file" id="modal-upload-player" accept="image/*" class="hidden">
+                    </label>
+                </div>
+
+                <!-- Inspector customizer -->
+                <div class="bg-slate-900/80 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between">
+                    <div>
+                        <div class="text-sm font-bold text-white">Chasing Guard / Inspector</div>
+                        <div class="text-xs text-slate-400">Custom Inspector Face</div>
+                    </div>
+                    <label class="px-3 py-1.5 bg-blue-500 hover:bg-blue-400 text-slate-950 text-xs font-bold rounded-xl cursor-pointer">
+                        Select Photo
+                        <input type="file" id="modal-upload-police" accept="image/*" class="hidden">
+                    </label>
+                </div>
+
+                <!-- Dog customizer -->
+                <div class="bg-slate-900/80 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between">
+                    <div>
+                        <div class="text-sm font-bold text-white">Guard's Dog</div>
+                        <div class="text-xs text-slate-400">Custom Dog Face</div>
+                    </div>
+                    <label class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-slate-950 text-xs font-bold rounded-xl cursor-pointer">
+                        Select Photo
+                        <input type="file" id="modal-upload-dog" accept="image/*" class="hidden">
+                    </label>
+                </div>
+            </div>
+
+            <button id="save-customizer-btn" class="mt-6 w-full py-3 rounded-2xl bg-amber-500 text-slate-950 font-bold uppercase tracking-wider hover:bg-amber-400 transition">
+                Done & Continue
+            </button>
+        </div>
+    </div>
+
+    <!-- Pause Modal -->
+    <div id="pause-modal" class="fixed inset-0 z-30 hidden flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+        <div class="glass-panel w-full max-w-sm rounded-3xl p-6 text-center border-slate-700">
+            <h2 class="text-3xl font-game text-yellow-400 mb-6">GAME PAUSED</h2>
+            <div class="space-y-3">
+                <button id="resume-btn" class="w-full py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-game text-xl tracking-wider">RESUME</button>
+                <button id="restart-from-pause-btn" class="w-full py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold">RESTART</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Modal -->
+    <div id="gameover-modal" class="fixed inset-0 z-30 hidden flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-lg">
+        <div class="glass-panel w-full max-w-md rounded-3xl p-6 md:p-8 text-center border-red-500/30 shadow-2xl relative overflow-hidden">
+            <h2 class="text-4xl md:text-5xl font-game text-red-500 mb-1 tracking-wide">BUSTED!</h2>
+            <p class="text-xs text-slate-400 uppercase tracking-widest font-bold mb-6">All 3 Lives Expired</p>
+
+            <!-- Score breakdown card -->
+            <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 mb-6 space-y-3">
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-slate-400 font-semibold">Final Score</span>
+                    <span id="final-score-text" class="font-game text-yellow-400 text-2xl">0</span>
+                </div>
+                <div class="flex justify-between items-center text-sm border-t border-slate-800 pt-2">
+                    <span class="text-slate-400 font-semibold">High Score</span>
+                    <span id="high-score-text" class="font-game text-amber-300 text-xl">0</span>
+                </div>
+                <div class="flex justify-between items-center text-sm border-t border-slate-800 pt-2">
+                    <span class="text-slate-400 font-semibold">DLI Coins Collected</span>
+                    <span id="final-coins-text" class="font-game text-yellow-400 text-xl">0</span>
+                </div>
+            </div>
+
+            <button id="restart-btn" class="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-slate-950 font-game text-2xl uppercase tracking-wider shadow-xl hover:brightness-110 active:scale-95 transition-all">
+                PLAY AGAIN (3 LIVES)
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Web Audio Synthesizer for retro dynamic SFX
+        class SoundSystem {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playCoin() {
+                if (this.muted) return;
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(987.77, now); // B5
+                osc.frequency.exponentialRampToValueAtTime(1318.51, now + 0.12); // E6
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.12);
+            }
+
+            playHit() {
+                if (this.muted) return;
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(40, now + 0.3);
+                gain.gain.setValueAtTime(0.4, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            }
+
+            playPowerup() {
+                if (this.muted) return;
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.linearRampToValueAtTime(800, now + 0.25);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.25);
+            }
+
+            playJump() {
+                if (this.muted) return;
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(220, now);
+                osc.frequency.exponentialRampToValueAtTime(440, now + 0.15);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.15);
+            }
+        }
+
+        const soundSystem = new SoundSystem();
+    </script>
+
+    <script>
+        // Game State Variables
+        const GAME_STATES = { MENU: 0, PLAYING: 1, PAUSED: 2, GAMEOVER: 3 };
+        let gameState = GAME_STATES.MENU;
+
+        // Constants & Config
+        const LANES = [-3.2, 0, 3.2];
+        const BASE_SPEED = 28;
+        const MAX_SPEED = 65;
+        const GRAVITY = -48;
+        const JUMP_FORCE = 16.5;
+
+        let gameSpeed = BASE_SPEED;
+        let score = 0;
+        let coinsCollected = 0;
+        let lives = 3;
+        let invulnerableTime = 0; // seconds remaining
+        let highScore = localStorage.getItem('subway_surfer_dli_highscore') || 0;
+
+        // Active Powerups State
+        let activePowerups = {
+            hoverboard: 0,
+            magnet: 0,
+            jetpack: 0,
+            sneakers: 0
+        };
+
+        // Texture Storage for Custom Avatars
+        const customTextures = {
+            player: null,
+            police: null,
+            dog: null
+        };
+
+        // Three.js Core Global References
+        let scene, camera, renderer;
+        let playerGroup, playerMesh, playerHeadMesh;
+        let policeGroup, policeMesh;
+        let dogGroup;
+        let trackSegments = [];
+        let obstacles = [];
+        let coinObjects = [];
+        let powerupObjects = [];
+        let particleSystems = [];
+        let jetpackFire = null;
+
+        // Player Motion Logic
+        let currentLane = 1; // 0: Left, 1: Center, 2: Right
+        let targetX = 0;
+        let playerY = 0;
+        let velocityY = 0;
+        let isGrounded = true;
+        let isRolling = false;
+        let rollTimer = 0;
+
+        // Chaser Distance offset (0 = caught, 1 = far back)
+        let chaserDistance = 1.0; 
+
+        // Dynamic DLI Coin Texture Generator Canvas
+        function createDLICoinTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+
+            // Gold Radial Background
+            const grad = ctx.createRadialGradient(128, 128, 10, 128, 128, 128);
+            grad.addColorStop(0, '#fef08a');
+            grad.addColorStop(0.5, '#eab308');
+            grad.addColorStop(1, '#a16207');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(128, 128, 120, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Inner Ring Rim
+            ctx.strokeStyle = '#fef08a';
+            ctx.lineWidth = 12;
+            ctx.beginPath();
+            ctx.arc(128, 128, 100, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Embossed "DLI" Text
+            ctx.font = '900 80px "Fredoka One", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            // Text Shadow / Emboss Effect
+            ctx.fillStyle = '#713f12';
+            ctx.fillText('DLI', 131, 131);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText('DLI', 128, 128);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            return texture;
+        }
+
+        function initScene() {
+            const canvas = document.getElementById('game-canvas');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0284c7); // Vibrant Blue Sky
+            scene.fog = new THREE.FogExp2(0x0284c7, 0.012);
+
+            camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 200);
+            camera.position.set(0, 5, 10);
+
+            renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xfffaed, 0.8);
+            dirLight.position.set(20, 40, 20);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 1024;
+            dirLight.shadow.mapSize.height = 1024;
+            dirLight.shadow.camera.near = 0.5;
+            dirLight.shadow.camera.far = 150;
+            dirLight.shadow.camera.left = -20;
+            dirLight.shadow.camera.right = 20;
+            dirLight.shadow.camera.top = 20;
+            dirLight.shadow.camera.bottom = -20;
+            scene.add(dirLight);
+
+            // Create Character Models & Initial Track
+            createPlayer();
+            createChasers();
+            buildInitialTrack();
+
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function createPlayer() {
+            playerGroup = new THREE.Group();
+
+            // Default Runner Material (Can be overridden by custom upload)
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.3 }); // Red Hoodie
+            const pantsMat = new THREE.MeshStandardMaterial({ color: 0x1e3a8a, roughness: 0.5 }); // Blue Jeans
+            const skinMat = new THREE.MeshStandardMaterial({ 
+                color: 0xfbcfe8, 
+                map: customTextures.player || null,
+                roughness: 0.4 
+            });
+
+            // Torso
+            const torso = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.1, 0.5), bodyMat);
+            torso.position.y = 1.25;
+            torso.castShadow = true;
+            playerGroup.add(torso);
+
+            // Head (With Custom Face Texture Support)
+            const headGeo = new THREE.BoxGeometry(0.65, 0.65, 0.65);
+            playerHeadMesh = new THREE.Mesh(headGeo, skinMat);
+            playerHeadMesh.position.y = 2.1;
+            playerHeadMesh.castShadow = true;
+            playerGroup.add(playerHeadMesh);
+
+            // Cap / Hair Accent
+            const cap = new THREE.Mesh(
+                new THREE.BoxGeometry(0.72, 0.18, 0.72),
+                new THREE.MeshStandardMaterial({ color: 0x3b82f6 })
+            );
+            cap.position.set(0, 2.45, -0.05);
+            playerGroup.add(cap);
+
+            // Legs
+            const legGeo = new THREE.BoxGeometry(0.32, 0.9, 0.35);
+            const legL = new THREE.Mesh(legGeo, pantsMat);
+            legL.position.set(-0.22, 0.45, 0);
+            legL.castShadow = true;
+            playerGroup.add(legL);
+
+            const legR = new THREE.Mesh(legGeo, pantsMat);
+            legR.position.set(0.22, 0.45, 0);
+            legR.castShadow = true;
+            playerGroup.add(legR);
+
+            // Jetpack Attachment (Initially hidden)
+            jetpackFire = new THREE.Group();
+            const jetpackBody = new THREE.Mesh(
+                new THREE.BoxGeometry(0.7, 0.8, 0.3),
+                new THREE.MeshStandardMaterial({ color: 0xeab308, metalness: 0.8 })
+            );
+            jetpackBody.position.set(0, 1.3, -0.35);
+            jetpackFire.add(jetpackBody);
+            jetpackFire.visible = false;
+            playerGroup.add(jetpackFire);
+
+            scene.add(playerGroup);
+        }
+
+        function createChasers() {
+            // Inspector Group
+            policeGroup = new THREE.Group();
+            const policeUniformMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4 });
+            const policeSkinMat = new THREE.MeshStandardMaterial({ 
+                color: 0xfed7aa, 
+                map: customTextures.police || null 
+            });
+
+            const pTorso = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.3, 0.6), policeUniformMat);
+            pTorso.position.y = 1.35;
+            policeGroup.add(pTorso);
+
+            const pHead = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), policeSkinMat);
+            pHead.position.y = 2.3;
+            policeGroup.add(pHead);
+
+            // Inspector Police Cap
+            const pHat = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.2, 0.85), policeUniformMat);
+            pHat.position.y = 2.7;
+            policeGroup.add(pHat);
+
+            scene.add(policeGroup);
+
+            // Dog Group
+            dogGroup = new THREE.Group();
+            const dogMat = new THREE.MeshStandardMaterial({ 
+                color: 0x78350f, 
+                map: customTextures.dog || null 
+            });
+
+            const dogBody = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.9), dogMat);
+            dogBody.position.y = 0.4;
+            dogGroup.add(dogBody);
+
+            const dogHead = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.45, 0.5), dogMat);
+            dogHead.position.set(0, 0.7, 0.45);
+            dogGroup.add(dogHead);
+
+            scene.add(dogGroup);
+        }
+
+        // Update Textures when users upload photos
+        function applyCustomTexture(type, imageSrc) {
+            const loader = new THREE.TextureLoader();
+            loader.load(imageSrc, (texture) => {
+                texture.encoding = THREE.sRGBEncoding;
+                customTextures[type] = texture;
+
+                if (type === 'player' && playerHeadMesh) {
+                    playerHeadMesh.material.map = texture;
+                    playerHeadMesh.material.needsUpdate = true;
+                } else if (type === 'police' && policeGroup) {
+                    policeGroup.children[1].material.map = texture; // Head mesh
+                    policeGroup.children[1].material.needsUpdate = true;
+                } else if (type === 'dog' && dogGroup) {
+                    dogGroup.children[0].material.map = texture; // Body/Head mesh
+                    dogGroup.children[0].material.needsUpdate = true;
+                }
+            });
+        }
+
+        function createTrackSegment(zPos) {
+            const segment = new THREE.Group();
+            segment.position.z = zPos;
+
+            // Ground Track Bed
+            const groundGeo = new THREE.PlaneGeometry(14, 60);
+            const groundMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.9 });
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            segment.add(ground);
+
+            // 3 Railway Tracks & Wooden Sleepers
+            LANES.forEach(x => {
+                for (let i = -28; i < 30; i += 2.5) {
+                    const sleeper = new THREE.Mesh(
+                        new THREE.BoxGeometry(2.0, 0.08, 0.4),
+                        new THREE.MeshStandardMaterial({ color: 0x451a03 })
+                    );
+                    sleeper.position.set(x, 0.04, i);
+                    segment.add(sleeper);
+                }
+
+                // Steel Rails
+                [-0.7, 0.7].forEach(railOffset => {
+                    const rail = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.12, 0.15, 60),
+                        new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.8 })
+                    );
+                    rail.position.set(x + railOffset, 0.12, 0);
+                    segment.add(rail);
+                });
+            });
+
+            // Side Walls / Environment
+            const wallMat = new THREE.MeshStandardMaterial({ color: 0x1e293b });
+            const wallL = new THREE.Mesh(new THREE.BoxGeometry(1, 8, 60), wallMat);
+            wallL.position.set(-8, 4, 0);
+            segment.add(wallL);
+
+            const wallR = new THREE.Mesh(new THREE.BoxGeometry(1, 8, 60), wallMat);
+            wallR.position.set(8, 4, 0);
+            segment.add(wallR);
+
+            scene.add(segment);
+            return segment;
+        }
+
+        function buildInitialTrack() {
+            for (let i = 0; i < 5; i++) {
+                const segment = createTrackSegment(-i * 60);
+                trackSegments.push(segment);
+            }
+        }
+
+        const dliCoinTexture = createDLICoinTexture();
+
+        function spawnCoinCluster(zPos) {
+            const lane = LANES[Math.floor(Math.random() * 3)];
+            const patternLength = 4 + Math.floor(Math.random() * 4);
+
+            for (let i = 0; i < patternLength; i++) {
+                const coinGroup = new THREE.Group();
+
+                // 3D Cylinder Round Coin Mesh with DLI Face Texture
+                const coinGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.14, 24);
+                const coinMat = [
+                    new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.9, roughness: 0.2 }), // Rim
+                    new THREE.MeshStandardMaterial({ map: dliCoinTexture, roughness: 0.2 }), // Top DLI Face
+                    new THREE.MeshStandardMaterial({ map: dliCoinTexture, roughness: 0.2 })  // Bottom DLI Face
+                ];
+
+                const coinMesh = new THREE.Mesh(coinGeo, coinMat);
+                coinMesh.rotation.x = Math.PI / 2; // Face forward
+                coinGroup.add(coinMesh);
+
+                // Round Glowing Aura / Soft Blur Sprite Outer Mesh
+                const auraGeo = new THREE.SphereGeometry(0.75, 16, 16);
+                const auraMat = new THREE.MeshBasicMaterial({
+                    color: 0xfacc15,
+                    transparent: true,
+                    opacity: 0.35,
+                    wireframe: false
+                });
+                const auraMesh = new THREE.Mesh(auraGeo, auraMat);
+                coinGroup.add(auraMesh);
+
+                coinGroup.position.set(lane, 1.2, zPos - i * 3.5);
+                scene.add(coinGroup);
+
+                coinObjects.push({
+                    group: coinGroup,
+                    mesh: coinMesh,
+                    active: true
+                });
+            }
+        }
+
+        function spawnObstacle(zPos) {
+            const lane = LANES[Math.floor(Math.random() * 3)];
+            const type = Math.random();
+
+            if (type < 0.6) {
+                // Train Obstacle
+                const trainGroup = new THREE.Group();
+                const trainMat = new THREE.MeshStandardMaterial({ color: 0x991b1b, roughness: 0.3 }); // Red Subway Train
+                const body = new THREE.Mesh(new THREE.BoxGeometry(2.4, 3.2, 14), trainMat);
+                body.position.y = 1.6;
+                body.castShadow = true;
+                trainGroup.add(body);
+
+                // Train Front Glass
+                const glassMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.9 });
+                const glass = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.2, 0.2), glassMat);
+                glass.position.set(0, 2.2, 7.01);
+                trainGroup.add(glass);
+
+                trainGroup.position.set(lane, 0, zPos);
+                scene.add(trainGroup);
+                obstacles.push({ group: trainGroup, type: 'train', width: 2.4, height: 3.2, depth: 14 });
+            } else {
+                // Wooden / Stripe Barrier
+                const barrierGroup = new THREE.Group();
+                const barMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b });
+                const bar = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.2, 0.3), barMat);
+                bar.position.y = 0.6;
+                bar.castShadow = true;
+                barrierGroup.add(bar);
+
+                barrierGroup.position.set(lane, 0, zPos);
+                scene.add(barrierGroup);
+                obstacles.push({ group: barrierGroup, type: 'barrier', width: 2.6, height: 1.2, depth: 0.3 });
+            }
+        }
+
+        function spawnPowerup(zPos) {
+            if (Math.random() > 0.4) return;
+            const lane = LANES[Math.floor(Math.random() * 3)];
+            const types = ['jetpack', 'magnet', 'hoverboard', 'sneakers'];
+            const chosenType = types[Math.floor(Math.random() * types.length)];
+
+            const group = new THREE.Group();
+            let color = 0x3b82f6;
+            if (chosenType === 'jetpack') color = 0xef4444;
+            if (chosenType === 'magnet') color = 0xeab308;
+            if (chosenType === 'hoverboard') color = 0x10b981;
+
+            const mesh = new THREE.Mesh(
+                new THREE.BoxGeometry(0.8, 0.8, 0.8),
+                new THREE.MeshStandardMaterial({ color: color, metalness: 0.8 })
+            );
+            mesh.position.y = 1.2;
+            group.add(mesh);
+
+            group.position.set(lane, 0, zPos);
+            scene.add(group);
+
+            powerupObjects.push({ group: group, type: chosenType, active: true });
+        }
+
+        function setupInputs() {
+            window.addEventListener('keydown', (e) => {
+                if (gameState !== GAME_STATES.PLAYING) return;
+
+                if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+                    if (currentLane > 0) currentLane--;
+                } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+                    if (currentLane < 2) currentLane++;
+                } else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W' || e.key === ' ') {
+                    if (isGrounded) {
+                        velocityY = JUMP_FORCE * (activePowerups.sneakers > 0 ? 1.45 : 1.0);
+                        isGrounded = false;
+                        soundSystem.playJump();
+                    }
+                } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
+                    if (!isRolling) {
+                        isRolling = true;
+                        rollTimer = 0.6;
+                        if (!isGrounded) velocityY = -20; // Fast drop
+                    }
+                }
+            });
+
+            // Mobile Touch Swipe Handling
+            let touchStartX = 0;
+            let touchStartY = 0;
+
+            window.addEventListener('touchstart', (e) => {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+            });
+
+            window.addEventListener('touchend', (e) => {
+                if (gameState !== GAME_STATES.PLAYING) return;
+                const dx = e.changedTouches[0].clientX - touchStartX;
+                const dy = e.changedTouches[0].clientY - touchStartY;
+
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    // Horizontal swipe
+                    if (dx > 30 && currentLane < 2) currentLane++;
+                    if (dx < -30 && currentLane > 0) currentLane--;
+                } else {
+                    // Vertical swipe
+                    if (dy < -30 && isGrounded) {
+                        velocityY = JUMP_FORCE * (activePowerups.sneakers > 0 ? 1.45 : 1.0);
+                        isGrounded = false;
+                        soundSystem.playJump();
+                    } else if (dy > 30) {
+                        isRolling = true;
+                        rollTimer = 0.6;
+                        if (!isGrounded) velocityY = -20;
+                    }
+                }
+            });
+        }
+
+        function handlePlayerHit() {
+            if (invulnerableTime > 0) return; // Currently shielded
+
+            soundSystem.playHit();
+            lives--;
+            updateLivesUI();
+
+            if (lives <= 0) {
+                // Game Over
+                endGame();
+            } else {
+                // Grant 2.5 Seconds Invulnerability Shield & Knockback
+                invulnerableTime = 2.5;
+                chaserDistance = 0.2; // Inspector moves right behind player!
+
+                // Trigger visual alert
+                const toast = document.getElementById('status-toast');
+                toast.innerText = `LIVES REMAINING: ${lives}`;
+                toast.classList.remove('hidden');
+                setTimeout(() => toast.classList.add('hidden'), 1800);
+            }
+        }
+
+        function updateLivesUI() {
+            const container = document.getElementById('lives-display');
+            container.innerHTML = '';
+            for (let i = 0; i < 3; i++) {
+                const heart = document.createElement('i');
+                if (i < lives) {
+                    heart.className = 'fa-solid fa-heart text-red-500 text-2xl heart-active filter drop-shadow';
+                } else {
+                    heart.className = 'fa-solid fa-heart text-slate-600 text-2xl filter drop-shadow opacity-40';
+                }
+                container.appendChild(heart);
+            }
+        }
+
+        let clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const delta = Math.min(clock.getDelta(), 0.1);
+
+            if (gameState === GAME_STATES.PLAYING) {
+                updateGameplay(delta);
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function updateGameplay(delta) {
+            // Speed progression
+            gameSpeed = Math.min(BASE_SPEED + (score / 400), MAX_SPEED);
+            score += Math.round(gameSpeed * delta * 2);
+            document.getElementById('score-text').innerText = String(score).padStart(6, '0');
+
+            // Manage Invulnerability
+            if (invulnerableTime > 0) {
+                invulnerableTime -= delta;
+                playerGroup.visible = Math.floor(Date.now() / 100) % 2 === 0; // Flashing effect
+            } else {
+                playerGroup.visible = true;
+            }
+
+            // Powerups Timer Update
+            Object.keys(activePowerups).forEach(key => {
+                if (activePowerups[key] > 0) {
+                    activePowerups[key] -= delta;
+                }
+            });
+
+            // Smooth Lane Transition
+            targetX = LANES[currentLane];
+            playerGroup.position.x += (targetX - playerGroup.position.x) * 15 * delta;
+
+            // Vertical Jump / Gravity Physics
+            if (activePowerups.jetpack > 0) {
+                playerY = 7.0; // Fly high
+                jetpackFire.visible = true;
+            } else {
+                jetpackFire.visible = false;
+                velocityY += GRAVITY * delta;
+                playerY += velocityY * delta;
+
+                if (playerY <= 0) {
+                    playerY = 0;
+                    velocityY = 0;
+                    isGrounded = true;
+                }
+            }
+            playerGroup.position.y = playerY;
+
+            // Rolling scale down
+            if (isRolling) {
+                rollTimer -= delta;
+                playerGroup.scale.set(1, 0.5, 1);
+                if (rollTimer <= 0) {
+                    isRolling = false;
+                    playerGroup.scale.set(1, 1, 1);
+                }
+            }
+
+            // Update Chaser Position
+            chaserDistance = Math.min(chaserDistance + delta * 0.15, 1.0);
+            const chaserZ = playerGroup.position.z + 2.2 + (1.0 - chaserDistance) * 3.5;
+            policeGroup.position.set(playerGroup.position.x * 0.8, playerGroup.position.y, chaserZ);
+            dogGroup.position.set(playerGroup.position.x * 0.8 + 0.9, playerGroup.position.y, chaserZ + 0.4);
+
+            // Move Track Segments
+            trackSegments.forEach(segment => {
+                segment.position.z += gameSpeed * delta;
+                if (segment.position.z > 60) {
+                    segment.position.z -= 300; // Recycle to back
+                    // Spawn new obstacles & coins on recycled segment
+                    spawnObstacle(segment.position.z - 20);
+                    spawnCoinCluster(segment.position.z - 10);
+                    spawnPowerup(segment.position.z - 30);
+                }
+            });
+
+            // Update & Collect DLI Coins
+            coinObjects.forEach(coin => {
+                if (!coin.active) return;
+                coin.group.position.z += gameSpeed * delta;
+
+                // Spin Coin
+                coin.mesh.rotation.z += 3.0 * delta;
+
+                // Magnet Powerup Attraction Logic
+                if (activePowerups.magnet > 0 && coin.group.position.z > -25) {
+                    coin.group.position.x += (playerGroup.position.x - coin.group.position.x) * 10 * delta;
+                    coin.group.position.y += (playerGroup.position.y + 1.2 - coin.group.position.y) * 10 * delta;
+                }
+
+                // Collision Check
+                const dist = playerGroup.position.distanceTo(coin.group.position);
+                if (dist < 1.6) {
+                    coin.active = false;
+                    scene.remove(coin.group);
+                    coinsCollected++;
+                    document.getElementById('coin-text').innerText = coinsCollected;
+                    soundSystem.playCoin();
+                }
+
+                // Cleanup offscreen coins
+                if (coin.group.position.z > 15) {
+                    coin.active = false;
+                    scene.remove(coin.group);
+                }
+            });
+
+            // Collision Detection with Obstacles
+            obstacles.forEach(obs => {
+                obs.group.position.z += gameSpeed * delta;
+
+                // Check overlap
+                const dx = Math.abs(playerGroup.position.x - obs.group.position.x);
+                const dz = Math.abs(playerGroup.position.z - obs.group.position.z);
+                const dy = playerGroup.position.y - obs.group.position.y;
+
+                if (dx < obs.width * 0.45 && dz < obs.depth * 0.45 && dy < obs.height) {
+                    if (activePowerups.hoverboard > 0) {
+                        // Hoverboard saves player from hit once
+                        activePowerups.hoverboard = 0;
+                        invulnerableTime = 2.0;
+                        soundSystem.playHit();
+                    } else {
+                        handlePlayerHit();
+                    }
+                }
+            });
+
+            // Powerup Pickup Collision
+            powerupObjects.forEach(pow => {
+                if (!pow.active) return;
+                pow.group.position.z += gameSpeed * delta;
+
+                if (playerGroup.position.distanceTo(pow.group.position) < 1.5) {
+                    pow.active = false;
+                    scene.remove(pow.group);
+                    activePowerups[pow.type] = 10.0; // 10s active duration
+                    soundSystem.playPowerup();
+                }
+            });
+
+            // Camera follow smoothly
+            camera.position.x += (playerGroup.position.x * 0.4 - camera.position.x) * 5 * delta;
+            camera.position.y = 5 + playerY * 0.3;
+        }
+
+        function startGame() {
+            lives = 3;
+            score = 0;
+            coinsCollected = 0;
+            gameSpeed = BASE_SPEED;
+            invulnerableTime = 0;
+            currentLane = 1;
+            playerGroup.position.set(0, 0, 0);
+
+            updateLivesUI();
+            document.getElementById('score-text').innerText = '000000';
+            document.getElementById('coin-text').innerText = '0';
+
+            // Clear previous items
+            obstacles.forEach(o => scene.remove(o.group));
+            coinObjects.forEach(c => scene.remove(c.group));
+            powerupObjects.forEach(p => scene.remove(p.group));
+            obstacles = [];
+            coinObjects = [];
+            powerupObjects = [];
+
+            // Spawn fresh batch
+            for (let z = -30; z > -250; z -= 40) {
+                spawnObstacle(z);
+                spawnCoinCluster(z + 15);
+            }
+
+            document.getElementById('start-modal').classList.add('hidden');
+            document.getElementById('gameover-modal').classList.add('hidden');
+            document.getElementById('pause-modal').classList.add('hidden');
+
+            gameState = GAME_STATES.PLAYING;
+            clock.start();
+        }
+
+        function endGame() {
+            gameState = GAME_STATES.GAMEOVER;
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('subway_surfer_dli_highscore', highScore);
+            }
+
+            document.getElementById('final-score-text').innerText = score;
+            document.getElementById('high-score-text').innerText = highScore;
+            document.getElementById('final-coins-text').innerText = coinsCollected;
+            document.getElementById('gameover-modal').classList.remove('hidden');
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Setup File Uploader Listeners for Custom Avatars
+        function handleFileUpload(inputEl, previewImgId, previewIconId, type) {
+            inputEl.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(evt) {
+                        const src = evt.target.result;
+                        if (previewImgId) {
+                            const img = document.getElementById(previewImgId);
+                            img.src = src;
+                            img.classList.remove('hidden');
+                            document.getElementById(previewIconId).classList.add('hidden');
+                        }
+                        applyCustomTexture(type, src);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        // Attach UI Listeners
+        window.onload = function() {
+            initScene();
+            setupInputs();
+
+            // Start Buttons
+            document.getElementById('start-btn').onclick = startGame;
+            document.getElementById('restart-btn').onclick = startGame;
+            document.getElementById('restart-from-pause-btn').onclick = startGame;
+
+            // Pause / Resume
+            document.getElementById('pause-btn').onclick = () => {
+                if (gameState === GAME_STATES.PLAYING) {
+                    gameState = GAME_STATES.PAUSED;
+                    document.getElementById('pause-modal').classList.remove('hidden');
+                }
+            };
+            document.getElementById('resume-btn').onclick = () => {
+                gameState = GAME_STATES.PLAYING;
+                document.getElementById('pause-modal').classList.add('hidden');
+            };
+
+            // Customizer Modal Toggles
+            document.getElementById('open-customizer-btn').onclick = () => {
+                document.getElementById('customizer-modal').classList.remove('hidden');
+            };
+            document.getElementById('close-customizer-btn').onclick = () => {
+                document.getElementById('customizer-modal').classList.add('hidden');
+            };
+            document.getElementById('save-customizer-btn').onclick = () => {
+                document.getElementById('customizer-modal').classList.add('hidden');
+            };
+
+            // Hook up File Uploads for Runner, Inspector, Dog
+            handleFileUpload(document.getElementById('upload-player-face'), 'preview-player-img', 'preview-player-icon', 'player');
+            handleFileUpload(document.getElementById('upload-police-face'), 'preview-police-img', 'preview-police-icon', 'police');
+            handleFileUpload(document.getElementById('upload-dog-face'), 'preview-dog-img', 'preview-dog-icon', 'dog');
+
+            handleFileUpload(document.getElementById('modal-upload-player'), 'preview-player-img', 'preview-player-icon', 'player');
+            handleFileUpload(document.getElementById('modal-upload-police'), 'preview-police-img', 'preview-police-icon', 'police');
+            handleFileUpload(document.getElementById('modal-upload-dog'), 'preview-dog-img', 'preview-dog-icon', 'dog');
+
+            // Begin Render Loop
+            animate();
+        };
+    </script>
+</body>
+</html>
